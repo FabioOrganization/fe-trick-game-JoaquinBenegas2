@@ -56,6 +56,10 @@ async function obtenerMazoPorFetch() {
      * 3. Usar la función `mezclar` para desordenar el array de cartas.
      * 4. Asignar el array mezclado a la variable global `mazo`.
      */
+
+    const response = await fetch(API_CARTAS);
+    const cartas = await response.json();
+    globalThis.mazo = mezclar(cartas);
 }
 
 /**
@@ -76,6 +80,20 @@ async function guardarPartidaFetch(ganador) {
      * 3. Enviar el objeto `partida` como cuerpo de la solicitud en formato JSON.
      * 4. Asegurarse de incluir el encabezado `Content-Type: application/json`.
      */
+
+    const partida = {
+        ganador: ganador,
+        jugadas: globalThis.rondas,
+        fecha: new Date().toISOString()
+    }
+
+    const response = await fetch(API_PARTIDAS, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(partida)
+    });
 }
 
 /**
@@ -91,6 +109,11 @@ async function getHistorialPartidasFetch() {
      * 3. Asignar el historial obtenido a la variable global `historialPartidas`.
      * 4. Llamar a la función `mostrarEstado` para actualizar la interfaz.
      */
+
+    const response = await fetch(API_PARTIDAS);
+    const partidas = await response.json();
+    globalThis.historialPartidas = partidas;
+    mostrarEstado();
 }
 
 /**
@@ -105,6 +128,9 @@ function repartirManos() {
      * 3. Extraer otras 3 cartas del mazo y asignarlas al jugador 2 (`manos[1]`).
      * 4. Asegurarse de que las cartas extraídas se eliminen del mazo.
      */
+
+    manos[0] = mazo.splice(0, 3);
+    manos[1] = mazo.splice(0, 3);
 }
 
 /**
@@ -121,6 +147,7 @@ function jerarquiaCarta(carta) {
      * 3. Si la carta coincide, devolver el índice correspondiente.
      * 4. Si no coincide, devolver el índice de la peor jerarquía (`JERARQUIA.length - 1`).
      */
+    return JERARQUIA.findIndex((cartaEnJerarquia) => cartaEnJerarquia[0] === carta.valor && (cartaEnJerarquia[1] === null || cartaEnJerarquia[1] === carta.palo));
 }
 
 /**
@@ -136,7 +163,7 @@ function jugarCarta(jugador, cartaIndex) {
     /**
      * TODO:
      * 1. Remover la carta seleccionada de la mano del jugador (`manos[jugador]`).
-     * 2. Obtener la última ronda de `rondas` o crear una nueva si no existe.
+     * 2. Obtener la última ronda de `rondas` o crear una nueva si no existe. // FIXME: Habría que explicar el formato que tiene ronda
      * 3. Asignar la carta jugada al campo correspondiente (`carta1` o `carta2`).
      * 4. Si ambos jugadores ya jugaron, determinar el ganador con `ganadorRonda`.
      * 5. Sumar un punto al ganador (si no es empate) en `puntajeRondas`.
@@ -144,6 +171,29 @@ function jugarCarta(jugador, cartaIndex) {
      * 7. Llamar a `mostrarEstado` para actualizar la interfaz.
      * 8. Si hay un ganador de la partida (`ganadorPartida`), guardar la partida y refrescar el historial.
      */
+
+    let carta = manos[jugador].splice(cartaIndex, 1)[0];
+    let ronda ;
+
+    if (rondas[rondas.length - 1] &&  (rondas[rondas.length - 1].carta1 === null || rondas[rondas.length - 1].carta2 === null)) {
+        ronda = rondas[rondas.length - 1];
+    } else {
+        ronda = {carta1: null, carta2: null};
+        globalThis.rondas.push(ronda);
+    }
+
+    if (!rondas.length) {
+        globalThis.rondas.push(ronda);
+    }
+
+    ronda[`carta${jugador + 1}`] = carta;
+
+    if (ronda.carta1 && ronda.carta2) {
+        ronda.ganador = ganadorRonda(ronda);
+        puntajeRondas[ronda.ganador] += 1;
+    }
+
+    globalThis.turno = 1 - jugador;
 
     mostrarEstado();
     // Chequea si terminó la partida, si sí guarda resultado y refresca historial
@@ -169,6 +219,17 @@ function ganadorRonda(ronda) {
      *    - Si `carta1` es mejor, devolver 0 (gana J1).
      *    - Si `carta2` es mejor, devolver 1 (gana J2).
      */
+
+    const jerarquia1 = jerarquiaCarta(ronda.carta1);
+    const jerarquia2 = jerarquiaCarta(ronda.carta2);
+
+    if (jerarquia1 === jerarquia2) {
+        return -1;
+    } else if (jerarquia1 < jerarquia2) {
+        return 0;
+    } else {
+        return 1;
+    }
 }
 
 /**
@@ -185,6 +246,14 @@ function ganadorPartida() {
      *    - Si es así, devolver 1 (gana J2).
      * 3. Si ninguno ha ganado, devolver null.
      */
+
+    if (puntajeRondas[0] >= 2) {
+        return 0;
+    } else if (puntajeRondas[1] >= 2) {
+        return 1;
+    } else {
+        return null;
+    }
 }
 
 /**
@@ -200,6 +269,14 @@ function mezclar(arr) {
      * 3. En cada iteración, intercambiar el elemento actual con uno aleatorio.
      * 4. Devolver el array mezclado.
      */
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        let temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+    }
+
+    return arr;
 }
 
 /**
